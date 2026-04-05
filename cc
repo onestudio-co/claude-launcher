@@ -5,6 +5,19 @@
 CLAUDE_PROJECTS="$HOME/.claude/projects"
 CLAUDE_FLAGS="${CLAUDE_FLAGS:---dangerously-skip-permissions}"
 
+# ── Flag parsing ─────────────────────────────────────────────────────────────
+
+launch_mode=normal
+typeset -a passthrough_args
+for arg in "$@"; do
+    case "$arg" in
+        --tmux)       launch_mode=tmux ;;
+        --new-window) [[ "$launch_mode" != tmux ]] && launch_mode=new-window ;;
+        *)            passthrough_args+=("$arg") ;;
+    esac
+done
+set -- "${passthrough_args[@]}"
+
 # ── Discovery ────────────────────────────────────────────────────────────────
 
 typeset -A seen
@@ -173,5 +186,21 @@ echo ""
     [[ -f "$LAUNCHER_HISTORY" ]] && grep -Fxv "$chosen" "$LAUNCHER_HISTORY"
 } | head -50 >| "${LAUNCHER_HISTORY}.tmp" && mv "${LAUNCHER_HISTORY}.tmp" "$LAUNCHER_HISTORY"
 
-cd "$chosen"
-exec claude $CLAUDE_FLAGS
+if [[ "$launch_mode" == tmux ]]; then
+    if [[ -n "$TMUX" ]]; then
+        tmux new-window -c "$chosen" "claude $CLAUDE_FLAGS"
+    else
+        print -P "%F{yellow}Warning: not inside a tmux session — launching normally.%f" >&2
+        cd "$chosen"
+        exec claude $CLAUDE_FLAGS
+    fi
+elif [[ "$launch_mode" == new-window ]]; then
+    if [[ -n "$TMUX" ]]; then
+        tmux new-window -c "$chosen" "claude $CLAUDE_FLAGS"
+    else
+        osascript -e "tell application \"Terminal\" to do script \"cd $(printf '%q' "$chosen") && claude $CLAUDE_FLAGS\""
+    fi
+else
+    cd "$chosen"
+    exec claude $CLAUDE_FLAGS
+fi
