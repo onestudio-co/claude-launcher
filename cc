@@ -74,28 +74,28 @@ get_agents() {
 # ── Selection ────────────────────────────────────────────────────────────────
 
 if command -v fzf &>/dev/null; then
-    # Build entries as "path\tdisplay" so fzf shows display but we extract path
-    local entries=()
-    for p in "${projects[@]}"; do
-        local display="${p/#$HOME/~}"
-        local agents=$(get_agents "$p")
-        if [[ -n "$agents" ]]; then
-            entries+=("${p}	${display}  · ${agents}")
-        else
-            entries+=("${p}	${display}")
-        fi
-    done
-
     local selected
-    selected=$(printf '%s\n' "${entries[@]}" | fzf \
+    selected=$(for p in "${projects[@]}"; do
+        local display="${p/#$HOME/~}"
+        local mtime=$(stat -f "%Sm" -t "%b %d" "$p" 2>/dev/null)
+        local agents=$(get_agents "$p")
+        # Line 1: path (hidden) TAB display + right-aligned date
+        printf '%s\t\033[1m%s\033[0m\t%s\n' "$p" "$display" "$mtime"
+        # Line 2: agents (if any), dimmed
+        [[ -n "$agents" ]] && printf '\t  \033[2m· %s\033[0m\n' "$agents"
+        # NUL terminates each multi-line item
+        printf '\0'
+    done | fzf \
+        --read0 \
+        --ansi \
         --prompt="Claude project > " \
-        --height=50% \
+        --height=60% \
         --border \
         --delimiter=$'\t' \
-        --with-nth=2 \
-        --preview='path=$(echo {1}); ls "$path"' \
+        --with-nth=2.. \
+        --preview='ls {1}' \
         --preview-window=right:40%) || { echo "Cancelled."; exit 0; }
-    chosen=$(echo "$selected" | cut -f1)
+    chosen=$(printf '%s' "$selected" | head -1 | cut -f1)
 else
     echo ""
     print -P "%B%F{cyan}  Claude Code — Project Launcher%f%b"
@@ -103,9 +103,10 @@ else
     idx=1
     for p in "${projects[@]}"; do
         display="${p/#$HOME/~}"
-        printf '  \033[1;33m%2d\033[0m  %s\n' "$idx" "$display"
+        mtime=$(stat -f "%Sm" -t "%b %d" "$p" 2>/dev/null)
+        printf '  \033[1;33m%2d\033[0m  %-50s \033[2m%s\033[0m\n' "$idx" "$display" "$mtime"
         agents=$(get_agents "$p")
-        [[ -n "$agents" ]] && printf '       \033[0;90m%s\033[0m\n' "$agents"
+        [[ -n "$agents" ]] && printf '       \033[2m· %s\033[0m\n' "$agents"
         (( idx++ ))
     done
     echo "──────────────────────────────────────────────────────"
