@@ -76,10 +76,9 @@ if command -v fzf &>/dev/null; then
         local display="${p/#$HOME/~}"
         local mtime=$(stat -f "%Sm" -t "%b %d" "$p" 2>/dev/null)
         local agents=$(get_agents "$p")
-        # Field 1 (hidden): path
-        # Field 2 (shown): padded display + dimmed date
-        printf '%s\t%-45s  \033[2m%s\033[0m\n' "$p" "$display" "$mtime"
-        [[ -n "$agents" ]] && printf '%s\t  \033[2m· %s\033[0m\n' "$p" "$agents"
+        # Embed path after ||| separator (hidden via --with-nth=1)
+        printf '%-45s  \033[2m%s\033[0m|||%s\n' "$display" "$mtime" "$p"
+        [[ -n "$agents" ]] && printf '  \033[2m· %s\033[0m|||\n' "$agents"
         printf '\0'
     done | fzf \
         --read0 \
@@ -90,13 +89,14 @@ if command -v fzf &>/dev/null; then
         --height=70% \
         --min-height=15 \
         --border=rounded \
-        --border-label=" 󱁤 Claude Code Projects " \
+        --border-label=" Claude Code Projects " \
         --padding=1,2 \
-        --delimiter=$'\t' \
-        --with-nth=2 \
+        --delimiter='|||' \
+        --with-nth=1 \
+        --nth=1 \
         --color='border:#585b70,label:#cba6f7,prompt:#cba6f7,pointer:#f38ba8,hl:yellow,hl+:yellow,info:#a6adc8' \
         --preview='
-            p={1}
+            p=$(echo {2})
             if [ -f "$p/CLAUDE.md" ]; then
                 cat "$p/CLAUDE.md"
             else
@@ -105,7 +105,7 @@ if command -v fzf &>/dev/null; then
         ' \
         --preview-window=right:45%:wrap \
         --preview-label=" CLAUDE.md ") || { echo "Cancelled."; exit 0; }
-    chosen=$(printf '%s' "$selected" | head -1 | cut -f1)
+    chosen=$(printf '%s' "$selected" | head -1 | sed 's/.*|||//')
 else
     echo ""
     print -P "%B%F{cyan}  Claude Code — Project Launcher%f%b"
