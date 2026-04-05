@@ -102,20 +102,13 @@ if [[ -n "$1" ]]; then
         exit 1
     elif (( ${#matches[@]} == 1 )); then
         chosen="${matches[1]}"
-        display="${chosen/#$HOME/~}"
-        echo ""
-        print -P "%F{green}  Opening:%f $display"
-        print -P "%F{245}  claude $CLAUDE_FLAGS%f"
-        echo ""
-        cd "$chosen"
-        exec claude $CLAUDE_FLAGS
     fi
     # 2+ matches: fall through to picker with query pre-seeded
 fi
 
-# ── Selection ────────────────────────────────────────────────────────────────
+# ── Selection (skipped if chosen already set by direct launch) ────────────────
 
-if command -v fzf &>/dev/null; then
+if [[ -z "$chosen" ]] && command -v fzf &>/dev/null; then
     # Build display lines: "path|||display  [branch] commit msg"
     typeset -a fzf_lines
     for p in "${projects[@]}"; do
@@ -127,7 +120,7 @@ if command -v fzf &>/dev/null; then
         else
             meta=""
         fi
-        fzf_lines+=("${p}|||${display}${meta}")
+        fzf_lines+=("${p}"$'\x01'"${display}${meta}")
     done
 
     chosen=$(printf '%s\n' "${fzf_lines[@]}" | fzf \
@@ -139,7 +132,7 @@ if command -v fzf &>/dev/null; then
         --border-label=" Claude Code Projects " \
         --padding=1,2 \
         --color='border:#585b70,label:#cba6f7,prompt:#cba6f7,pointer:#f38ba8,hl:yellow,hl+:yellow,info:#a6adc8' \
-        --delimiter='|||' \
+        --delimiter=$'\x01' \
         --with-nth=2 \
         --nth=1 \
         --ansi \
@@ -147,8 +140,8 @@ if command -v fzf &>/dev/null; then
         --preview-window=right:45%:wrap \
         --preview-label=" CLAUDE.md " \
         ${1:+--query "$1"}) || { echo "Cancelled."; exit 0; }
-    chosen="${chosen%%|||*}"
-else
+    chosen="${chosen%%$'\x01'*}"
+elif [[ -z "$chosen" ]]; then
     echo ""
     print -P "%B%F{cyan}  Claude Code — Project Launcher%f%b"
     echo "──────────────────────────────────────────────────────"
