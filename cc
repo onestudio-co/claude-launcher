@@ -53,8 +53,25 @@ if [[ ${#projects[@]} -eq 0 ]]; then
     exit 1
 fi
 
-# Sort alphabetically
-projects=(${(o)projects})
+# Sort by recency: history entries first (in history order), then rest alphabetically
+LAUNCHER_HISTORY="$HOME/.claude/launcher_history"
+typeset -a recent_projects other_projects
+if [[ -f "$LAUNCHER_HISTORY" ]]; then
+    while IFS= read -r hist_path; do
+        [[ -z "$hist_path" ]] && continue
+        if [[ -n "${seen[$hist_path]}" ]]; then
+            recent_projects+=("$hist_path")
+        fi
+    done < "$LAUNCHER_HISTORY"
+fi
+for p in ${(o)projects}; do
+    local in_history=0
+    for rp in "${recent_projects[@]}"; do
+        [[ "$rp" == "$p" ]] && in_history=1 && break
+    done
+    (( in_history )) || other_projects+=("$p")
+done
+projects=("${recent_projects[@]}" "${other_projects[@]}")
 
 # ── Selection ────────────────────────────────────────────────────────────────
 
@@ -102,6 +119,12 @@ echo ""
 print -P "%F{green}  Opening:%f $display"
 print -P "%F{245}  claude $CLAUDE_FLAGS%f"
 echo ""
+
+# Record chosen project in history (newest first, deduplicated, max 50)
+{
+    print -r -- "$chosen"
+    [[ -f "$LAUNCHER_HISTORY" ]] && grep -Fxv "$chosen" "$LAUNCHER_HISTORY"
+} | head -50 >| "${LAUNCHER_HISTORY}.tmp" && mv "${LAUNCHER_HISTORY}.tmp" "$LAUNCHER_HISTORY"
 
 cd "$chosen"
 exec claude $CLAUDE_FLAGS
