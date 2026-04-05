@@ -30,20 +30,15 @@ done < <(find "$HOME" -maxdepth 5 \
 if [[ -d "$CLAUDE_PROJECTS" ]]; then
     for encoded_path in "$CLAUDE_PROJECTS"/*/; do
         local encoded=$(basename "$encoded_path")
-
-# Naive decode: leading '-' represents '/', each '-' is a '/'
         local candidate="/${encoded#-}"
         candidate="${candidate//-//}"
-
         if [[ ! -d "$candidate" ]]; then
-            # Hyphens-in-dir-name fallback: treat suffix after home dir as literal
             local home_encoded="${HOME//\//\-}"
             local suffix="${encoded#${home_encoded#-}-}"
             [[ "$suffix" == "$encoded" ]] && continue
             candidate="$HOME/$suffix"
             [[ ! -d "$candidate" ]] && continue
         fi
-
         add_project "$candidate"
     done
 fi
@@ -53,8 +48,11 @@ if [[ ${#projects[@]} -eq 0 ]]; then
     exit 1
 fi
 
-# Sort alphabetically
-projects=(${(o)projects})
+# Sort by most recently modified
+projects=($(for p in "${projects[@]}"; do
+    mtime=$(stat -f "%m" "$p" 2>/dev/null || echo 0)
+    echo "${mtime} ${p}"
+done | sort -rn | awk '{print $2}'))
 
 # ── Agents ───────────────────────────────────────────────────────────────────
 
@@ -62,8 +60,7 @@ get_agents() {
     local agents_dir="$1/.claude/agents"
     [[ ! -d "$agents_dir" ]] && return
     local names=() name
-    for f in "$agents_dir"/*.md; do
-        [[ -f "$f" ]] || continue
+    for f in "$agents_dir"/*.md(N); do
         name=$(grep -m1 '^name:' "$f" 2>/dev/null | sed 's/^name:[[:space:]]*//' | tr -d '"')
         [[ -z "$name" ]] && name=$(basename "$f" .md)
         names+=("$name")
@@ -79,22 +76,35 @@ if command -v fzf &>/dev/null; then
         local display="${p/#$HOME/~}"
         local mtime=$(stat -f "%Sm" -t "%b %d" "$p" 2>/dev/null)
         local agents=$(get_agents "$p")
-        # Line 1: path (hidden) TAB display + right-aligned date
-        printf '%s\t\033[1m%s\033[0m\t%s\n' "$p" "$display" "$mtime"
-        # Line 2: agents (if any), dimmed
+        # Field 1 (hidden): path
+        # Field 2 (shown): padded display + dimmed date
+        printf '%s\t%-45s  \033[2m%s\033[0m\n' "$p" "$display" "$mtime"
         [[ -n "$agents" ]] && printf '\t  \033[2m· %s\033[0m\n' "$agents"
-        # NUL terminates each multi-line item
         printf '\0'
     done | fzf \
         --read0 \
         --ansi \
-        --prompt="Claude project > " \
-        --height=60% \
-        --border \
+        --prompt=" Claude  " \
+        --pointer="▶" \
+        --marker="✓" \
+        --height=70% \
+        --min-height=15 \
+        --border=rounded \
+        --border-label=" 󱁤 Claude Code Projects " \
+        --padding=1,2 \
         --delimiter=$'\t' \
-        --with-nth=2.. \
-        --preview='ls {1}' \
-        --preview-window=right:40%) || { echo "Cancelled."; exit 0; }
+        --with-nth=2 \
+        --color='border:#585b70,label:#cba6f7,prompt:#cba6f7,pointer:#f38ba8,hl:yellow,hl+:yellow,info:#a6adc8' \
+        --preview='
+            p={1}
+            if [ -f "$p/CLAUDE.md" ]; then
+                cat "$p/CLAUDE.md"
+            else
+                ls "$p"
+            fi
+        ' \
+        --preview-window=right:45%:wrap \
+        --preview-label=" CLAUDE.md ") || { echo "Cancelled."; exit 0; }
     chosen=$(printf '%s' "$selected" | head -1 | cut -f1)
 else
     echo ""
