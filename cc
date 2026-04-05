@@ -79,7 +79,7 @@ if command -v fzf &>/dev/null; then
         # Field 1 (hidden): path
         # Field 2 (shown): padded display + dimmed date
         printf '%s\t%-45s  \033[2m%s\033[0m\n' "$p" "$display" "$mtime"
-        [[ -n "$agents" ]] && printf '\t  \033[2m· %s\033[0m\n' "$agents"
+        [[ -n "$agents" ]] && printf '%s\t  \033[2m· %s\033[0m\n' "$p" "$agents"
         printf '\0'
     done | fzf \
         --read0 \
