@@ -31,9 +31,7 @@ if [[ -d "$CLAUDE_PROJECTS" ]]; then
     for encoded_path in "$CLAUDE_PROJECTS"/*/; do
         local encoded=$(basename "$encoded_path")
 
-        [[ "$encoded" == *paperclip* || "$encoded" == *worktree* || "$encoded" == *workspaces* ]] && continue
-
-        # Naive decode: leading '-' represents '/', each '-' is a '/'
+# Naive decode: leading '-' represents '/', each '-' is a '/'
         local candidate="/${encoded#-}"
         candidate="${candidate//-//}"
 
