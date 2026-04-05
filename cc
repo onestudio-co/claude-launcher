@@ -60,11 +60,17 @@ projects=(${(o)projects})
 
 if command -v fzf &>/dev/null; then
     chosen=$(printf '%s\n' "${projects[@]}" | fzf \
-        --prompt="Claude project > " \
-        --height=50% \
-        --border \
-        --preview='ls {}' \
-        --preview-window=right:40%) || { echo "Cancelled."; exit 0; }
+        --prompt=" Claude  " \
+        --pointer="▶" \
+        --height=70% \
+        --min-height=15 \
+        --border=rounded \
+        --border-label=" Claude Code Projects " \
+        --padding=1,2 \
+        --color='border:#585b70,label:#cba6f7,prompt:#cba6f7,pointer:#f38ba8,hl:yellow,hl+:yellow,info:#a6adc8' \
+        --preview='p={}; if [ -f "$p/CLAUDE.md" ]; then cat "$p/CLAUDE.md"; else ls "$p"; fi' \
+        --preview-window=right:45%:wrap \
+        --preview-label=" CLAUDE.md ") || { echo "Cancelled."; exit 0; }
 else
     echo ""
     print -P "%B%F{cyan}  Claude Code — Project Launcher%f%b"
