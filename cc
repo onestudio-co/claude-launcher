@@ -80,16 +80,16 @@ if command -v fzf &>/dev/null; then
         --border \
         --preview='
             agents_dir="{}/.claude/agents"
-            if [[ -d "$agents_dir" ]]; then
-                names=()
+            if [ -d "$agents_dir" ]; then
+                names=""
                 for f in "$agents_dir"/*.md; do
-                    [[ -f "$f" ]] || continue
+                    [ -f "$f" ] || continue
                     name=$(grep -m1 "^name:" "$f" 2>/dev/null | sed "s/^name:[[:space:]]*//" | tr -d "\"")
-                    [[ -z "$name" ]] && name=$(basename "$f" .md)
-                    names+=("$name")
+                    [ -z "$name" ] && name=$(basename "$f" .md)
+                    names="${names:+$names, }$name"
                 done
-                if [[ ${#names[@]} -gt 0 ]]; then
-                    echo "Agents: ${(j:, :)names}"
+                if [ -n "$names" ]; then
+                    echo "Agents: $names"
                     echo ""
                 fi
             fi
