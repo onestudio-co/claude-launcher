@@ -56,6 +56,21 @@ fi
 # Sort alphabetically
 projects=(${(o)projects})
 
+# ── Agents ───────────────────────────────────────────────────────────────────
+
+get_agents() {
+    local agents_dir="$1/.claude/agents"
+    [[ ! -d "$agents_dir" ]] && return
+    local names=() name
+    for f in "$agents_dir"/*.md; do
+        [[ -f "$f" ]] || continue
+        name=$(grep -m1 '^name:' "$f" 2>/dev/null | sed 's/^name:[[:space:]]*//' | tr -d '"')
+        [[ -z "$name" ]] && name=$(basename "$f" .md)
+        names+=("$name")
+    done
+    [[ ${#names[@]} -gt 0 ]] && echo "${(j:, :)names}"
+}
+
 # ── Selection ────────────────────────────────────────────────────────────────
 
 if command -v fzf &>/dev/null; then
@@ -63,7 +78,23 @@ if command -v fzf &>/dev/null; then
         --prompt="Claude project > " \
         --height=50% \
         --border \
-        --preview='ls {}' \
+        --preview='
+            agents_dir="{}/.claude/agents"
+            if [[ -d "$agents_dir" ]]; then
+                names=()
+                for f in "$agents_dir"/*.md; do
+                    [[ -f "$f" ]] || continue
+                    name=$(grep -m1 "^name:" "$f" 2>/dev/null | sed "s/^name:[[:space:]]*//" | tr -d "\"")
+                    [[ -z "$name" ]] && name=$(basename "$f" .md)
+                    names+=("$name")
+                done
+                if [[ ${#names[@]} -gt 0 ]]; then
+                    echo "Agents: ${(j:, :)names}"
+                    echo ""
+                fi
+            fi
+            ls {}
+        ' \
         --preview-window=right:40%) || { echo "Cancelled."; exit 0; }
 else
     echo ""
@@ -73,6 +104,8 @@ else
     for p in "${projects[@]}"; do
         display="${p/#$HOME/~}"
         printf '  \033[1;33m%2d\033[0m  %s\n' "$idx" "$display"
+        agents=$(get_agents "$p")
+        [[ -n "$agents" ]] && printf '       \033[0;90m%s\033[0m\n' "$agents"
         (( idx++ ))
     done
     echo "──────────────────────────────────────────────────────"
