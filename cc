@@ -56,6 +56,33 @@ fi
 # Sort alphabetically
 projects=(${(o)projects})
 
+# ── Direct launch via query argument ─────────────────────────────────────────
+
+if [[ -n "$1" ]]; then
+    typeset -a matches
+    for p in "${projects[@]}"; do
+        local base="${p:t}"
+        if [[ "${base:l}" == *"${1:l}"* ]]; then
+            matches+=("$p")
+        fi
+    done
+
+    if (( ${#matches[@]} == 0 )); then
+        print -P "%F{red}No projects matching '%F{yellow}$1%F{red}'.%f" >&2
+        exit 1
+    elif (( ${#matches[@]} == 1 )); then
+        chosen="${matches[1]}"
+        display="${chosen/#$HOME/~}"
+        echo ""
+        print -P "%F{green}  Opening:%f $display"
+        print -P "%F{245}  claude $CLAUDE_FLAGS%f"
+        echo ""
+        cd "$chosen"
+        exec claude $CLAUDE_FLAGS
+    fi
+    # 2+ matches: fall through to picker with query pre-seeded
+fi
+
 # ── Selection ────────────────────────────────────────────────────────────────
 
 if command -v fzf &>/dev/null; then
@@ -70,7 +97,8 @@ if command -v fzf &>/dev/null; then
         --color='border:#585b70,label:#cba6f7,prompt:#cba6f7,pointer:#f38ba8,hl:yellow,hl+:yellow,info:#a6adc8' \
         --preview='p={}; if [ -f "$p/CLAUDE.md" ]; then cat "$p/CLAUDE.md"; else ls "$p"; fi' \
         --preview-window=right:45%:wrap \
-        --preview-label=" CLAUDE.md ") || { echo "Cancelled."; exit 0; }
+        --preview-label=" CLAUDE.md " \
+        ${1:+--query "$1"}) || { echo "Cancelled."; exit 0; }
 else
     echo ""
     print -P "%B%F{cyan}  Claude Code — Project Launcher%f%b"
