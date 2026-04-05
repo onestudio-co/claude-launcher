@@ -116,7 +116,7 @@ if [[ -z "$chosen" ]] && command -v fzf &>/dev/null; then
         branch=$(git -C "$p" rev-parse --abbrev-ref HEAD 2>/dev/null)
         commit=$(git -C "$p" log -1 --format="%s" 2>/dev/null)
         if [[ -n "$branch" ]]; then
-            meta="  \033[2;37m[$branch] $commit\033[0m"
+            meta=$(printf "  \033[2;37m[%s] %s\033[0m" "$branch" "$commit")
         else
             meta=""
         fi
