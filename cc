@@ -103,7 +103,21 @@ fi
 # ── Selection ────────────────────────────────────────────────────────────────
 
 if command -v fzf &>/dev/null; then
-    chosen=$(printf '%s\n' "${projects[@]}" | fzf \
+    # Build display lines: "path|||display  [branch] commit msg"
+    typeset -a fzf_lines
+    for p in "${projects[@]}"; do
+        display="${p/#$HOME/~}"
+        branch=$(git -C "$p" rev-parse --abbrev-ref HEAD 2>/dev/null)
+        commit=$(git -C "$p" log -1 --format="%s" 2>/dev/null)
+        if [[ -n "$branch" ]]; then
+            meta="  \033[2;37m[$branch] $commit\033[0m"
+        else
+            meta=""
+        fi
+        fzf_lines+=("${p}|||${display}${meta}")
+    done
+
+    chosen=$(printf '%s\n' "${fzf_lines[@]}" | fzf \
         --prompt=" Claude  " \
         --pointer="▶" \
         --height=70% \
@@ -112,10 +126,15 @@ if command -v fzf &>/dev/null; then
         --border-label=" Claude Code Projects " \
         --padding=1,2 \
         --color='border:#585b70,label:#cba6f7,prompt:#cba6f7,pointer:#f38ba8,hl:yellow,hl+:yellow,info:#a6adc8' \
-        --preview='p={}; if [ -f "$p/CLAUDE.md" ]; then cat "$p/CLAUDE.md"; else ls "$p"; fi' \
+        --delimiter='|||' \
+        --with-nth=2 \
+        --nth=1 \
+        --ansi \
+        --preview='p={1}; if [ -f "$p/CLAUDE.md" ]; then cat "$p/CLAUDE.md"; else ls "$p"; fi' \
         --preview-window=right:45%:wrap \
         --preview-label=" CLAUDE.md " \
         ${1:+--query "$1"}) || { echo "Cancelled."; exit 0; }
+    chosen="${chosen%%|||*}"
 else
     echo ""
     print -P "%B%F{cyan}  Claude Code — Project Launcher%f%b"
