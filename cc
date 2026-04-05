@@ -74,28 +74,28 @@ get_agents() {
 # ── Selection ────────────────────────────────────────────────────────────────
 
 if command -v fzf &>/dev/null; then
-    chosen=$(printf '%s\n' "${projects[@]}" | fzf \
+    # Build entries as "path\tdisplay" so fzf shows display but we extract path
+    local entries=()
+    for p in "${projects[@]}"; do
+        local display="${p/#$HOME/~}"
+        local agents=$(get_agents "$p")
+        if [[ -n "$agents" ]]; then
+            entries+=("${p}	${display}  · ${agents}")
+        else
+            entries+=("${p}	${display}")
+        fi
+    done
+
+    local selected
+    selected=$(printf '%s\n' "${entries[@]}" | fzf \
         --prompt="Claude project > " \
         --height=50% \
         --border \
-        --preview='
-            agents_dir="{}/.claude/agents"
-            if [ -d "$agents_dir" ]; then
-                names=""
-                for f in "$agents_dir"/*.md; do
-                    [ -f "$f" ] || continue
-                    name=$(grep -m1 "^name:" "$f" 2>/dev/null | sed "s/^name:[[:space:]]*//" | tr -d "\"")
-                    [ -z "$name" ] && name=$(basename "$f" .md)
-                    names="${names:+$names, }$name"
-                done
-                if [ -n "$names" ]; then
-                    echo "Agents: $names"
-                    echo ""
-                fi
-            fi
-            ls {}
-        ' \
+        --delimiter=$'\t' \
+        --with-nth=2 \
+        --preview='path=$(echo {1}); ls "$path"' \
         --preview-window=right:40%) || { echo "Cancelled."; exit 0; }
+    chosen=$(echo "$selected" | cut -f1)
 else
     echo ""
     print -P "%B%F{cyan}  Claude Code — Project Launcher%f%b"
